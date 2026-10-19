@@ -1,0 +1,26 @@
+{
+  "name": "eric-johnson-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal Vercel AI SDK v7 ToolLoopAgent with a unit-conversion tool, traced to Phoenix",
+  "type": "module",
+  "scripts": {
+    "start": "tsx --env-file-if-exists=.env agent.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.82",
+    "@ai-sdk/otel": "^1.0.143",
+    "@arizeai/phoenix-otel": "^2.2.0",
+    "ai": "^7.0.143",
+    "zod": "^4.1.8"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "tsx": "^4.23.9",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}
