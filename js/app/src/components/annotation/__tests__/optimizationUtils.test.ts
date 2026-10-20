@@ -1,5 +1,7 @@
+import type { AnnotationOptimizationConfig } from "../optimizationUtils";
 import {
   getOptimizationBounds,
+  getOptimizationTrend,
   getPositiveOptimization,
   getPositiveOptimizationFromConfig,
 } from "../optimizationUtils";
@@ -560,5 +562,267 @@ describe("getPositiveOptimizationFromConfig", () => {
         score: 0.75,
       })
     ).toBe(false);
+  });
+});
+
+describe("getOptimizationTrend", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  const makePoints = (scores: ReadonlyArray<number | null | undefined>) =>
+    scores.map((meanScore, index) => ({ x: index * DAY, meanScore }));
+
+  const minimizeContinuousConfig: AnnotationConfigContinuous = {
+    ...continuousConfig,
+    name: "hallucination_rate",
+    optimizationDirection: "MINIMIZE",
+  };
+
+  it("returns better when a MAXIMIZE score rises", () => {
+    const trend = getOptimizationTrend({
+      points: makePoints([0.45, 0.6, 0.85]),
+      config: continuousConfig,
+    });
+    expect(trend?.verdict).toBe("better");
+    expect(trend?.delta).toBeCloseTo(0.4);
+  });
+
+  it("returns worse when a MINIMIZE score rises", () => {
+    // Daily hallucination_rate means from the seeded demo project
+    const trend = getOptimizationTrend({
+      points: makePoints([
+        0.142, 0.155, 0.218, 0.265, 0.285, 0.398, 0.383, 0.486,
+      ]),
+      config: minimizeContinuousConfig,
+    });
+    expect(trend?.verdict).toBe("worse");
+    expect(trend?.delta).toBeCloseTo(0.344);
+  });
+
+  it("returns better when a MINIMIZE score falls", () => {
+    expect(
+      getOptimizationTrend({
+        points: makePoints([0.5, 0.2]),
+        config: minimizeContinuousConfig,
+      })?.verdict
+    ).toBe("better");
+  });
+
+  it("returns worse when a MAXIMIZE score falls", () => {
+    expect(
+      getOptimizationTrend({
+        points: makePoints([0.8, 0.3]),
+        config: continuousConfig,
+      })?.verdict
+    ).toBe("worse");
+  });
+
+  it("returns flat when the change is within the tolerance", () => {
+    expect(
+      getOptimizationTrend({
+        points: makePoints([0.5, 0.9, 0.52]),
+        config: continuousConfig,
+      })?.verdict
+    ).toBe("flat");
+    expect(
+      getOptimizationTrend({
+        points: makePoints([0.5, 0.48]),
+        config: minimizeContinuousConfig,
+      })?.verdict
+    ).toBe("flat");
+  });
+
+  it("returns flat when the change sits exactly on the tolerance", () => {
+    // 0.55 - 0.5 is 0.05000000000000004 in floating point
+    expect(
+      getOptimizationTrend({
+        points: makePoints([0.5, 0.55]),
+        config: continuousConfig,
+      })?.verdict
+    ).toBe("flat");
+    expect(
+      getOptimizationTrend({
+        points: makePoints([0.55, 0.5]),
+        config: continuousConfig,
+      })?.verdict
+    ).toBe("flat");
+  });
+
+  it("returns a verdict once the change passes the tolerance", () => {
+    expect(
+      getOptimizationTrend({
+        points: makePoints([0.5, 0.551]),
+        config: continuousConfig,
+      })?.verdict
+    ).toBe("better");
+  });
+
+  it("scales the tolerance with the config's range", () => {
+    const percentConfig: AnnotationConfigContinuous = {
+      ...continuousConfig,
+      lowerBound: 0,
+      upperBound: 100,
+    };
+    // 4 points on a 0-100 scale is within the default 5-point tolerance
+    expect(
+      getOptimizationTrend({
+        points: makePoints([50, 54]),
+        config: percentConfig,
+      })
+    ).toMatchObject({ verdict: "flat", flatTolerance: 5 });
+  });
+
+  it("uses a custom flat tolerance fraction", () => {
+    const points = makePoints([0.5, 0.58]);
+    expect(
+      getOptimizationTrend({ points, config: continuousConfig })?.verdict
+    ).toBe("better");
+    expect(
+      getOptimizationTrend({
+        points,
+        config: continuousConfig,
+        flatToleranceFraction: 0.1,
+      })?.verdict
+    ).toBe("flat");
+  });
+
+  it("compares the first and last scored points, skipping unscored bins", () => {
+    const trend = getOptimizationTrend({
+      points: makePoints([null, 0.2, undefined, 0.3, 0.7, null, undefined]),
+      config: continuousConfig,
+    });
+    expect(trend?.start).toEqual({ x: DAY, score: 0.2 });
+    expect(trend?.end).toEqual({ x: 4 * DAY, score: 0.7 });
+  });
+
+  it("orders points by x before comparing", () => {
+    const trend = getOptimizationTrend({
+      points: [
+        { x: 2 * DAY, meanScore: 0.9 },
+        { x: 0, meanScore: 0.1 },
+        { x: DAY, meanScore: 0.4 },
+      ],
+      config: continuousConfig,
+    });
+    expect(trend?.start).toEqual({ x: 0, score: 0.1 });
+    expect(trend?.end).toEqual({ x: 2 * DAY, score: 0.9 });
+    expect(trend?.verdict).toBe("better");
+  });
+
+  it("does not mutate the input points", () => {
+    const points = [
+      { x: DAY, meanScore: 0.9 },
+      { x: 0, meanScore: 0.1 },
+    ];
+    getOptimizationTrend({ points, config: continuousConfig });
+    expect(points.map(({ x }) => x)).toEqual([DAY, 0]);
+  });
+
+  it("uses bounds derived from CATEGORICAL values", () => {
+    const toxicityConfig: AnnotationConfigCategorical = {
+      annotationType: "CATEGORICAL",
+      name: "toxicity",
+      optimizationDirection: "MINIMIZE",
+      values: [
+        { label: "toxic", score: 1 },
+        { label: "borderline", score: 0.5 },
+        { label: "safe", score: 0 },
+      ],
+    };
+    expect(
+      getOptimizationTrend({
+        points: makePoints([0.35, 0.5]),
+        config: toxicityConfig,
+      })
+    ).toMatchObject({ verdict: "worse", flatTolerance: 0.05 });
+  });
+
+  it("returns the compared points, delta and tolerance", () => {
+    const trend = getOptimizationTrend({
+      points: makePoints([0.25, 0.5, 0.75]),
+      config: continuousConfig,
+    });
+    expect(trend).toEqual({
+      verdict: "better",
+      delta: 0.5,
+      start: { x: 0, score: 0.25 },
+      end: { x: 2 * DAY, score: 0.75 },
+      flatTolerance: 0.05,
+    });
+  });
+
+  describe("returns null when the trend cannot be judged", () => {
+    const risingPoints = makePoints([0.2, 0.8]);
+
+    it("returns null when config is undefined", () => {
+      expect(
+        getOptimizationTrend({ points: risingPoints, config: undefined })
+      ).toBeNull();
+    });
+
+    it("returns null when optimizationDirection is NONE", () => {
+      expect(
+        getOptimizationTrend({
+          points: risingPoints,
+          config: { ...continuousConfig, optimizationDirection: "NONE" },
+        })
+      ).toBeNull();
+    });
+
+    it("returns null when optimizationDirection is missing", () => {
+      const config: AnnotationOptimizationConfig = {
+        annotationType: "CONTINUOUS",
+        lowerBound: 0,
+        upperBound: 1,
+      };
+      expect(getOptimizationTrend({ points: risingPoints, config })).toBeNull();
+    });
+
+    it("returns null when bounds are missing", () => {
+      expect(
+        getOptimizationTrend({
+          points: risingPoints,
+          config: { ...continuousConfig, lowerBound: null, upperBound: null },
+        })
+      ).toBeNull();
+    });
+
+    it("returns null when only one bound is set", () => {
+      expect(
+        getOptimizationTrend({
+          points: risingPoints,
+          config: { ...continuousConfig, upperBound: null },
+        })
+      ).toBeNull();
+    });
+
+    it("returns null when CATEGORICAL values span no range", () => {
+      expect(
+        getOptimizationTrend({
+          points: risingPoints,
+          config: {
+            ...categoricalConfig,
+            values: [
+              { label: "a", score: 1 },
+              { label: "b", score: null },
+            ],
+          },
+        })
+      ).toBeNull();
+    });
+
+    it("returns null with fewer than two scored points", () => {
+      expect(
+        getOptimizationTrend({
+          points: makePoints([null, 0.4, undefined]),
+          config: continuousConfig,
+        })
+      ).toBeNull();
+    });
+
+    it("returns null for empty points", () => {
+      expect(
+        getOptimizationTrend({ points: [], config: continuousConfig })
+      ).toBeNull();
+    });
   });
 });
