@@ -82,4 +82,8 @@ const projectUrl = new URL(
   `redirects/projects/${encodeURIComponent(projectName)}`,
   phoenixBaseUrl.endsWith("/") ? phoenixBaseUrl : `${phoenixBaseUrl}/`
 );
-console.log(`\n✅ Done - view the trace at ${projectUrl}`);
+console.log(
+  process.exitCode === 1
+    ? `\n⚠️ Run failed - the errored trace is at ${projectUrl}`
+    : `\n✅ Done - view the trace at ${projectUrl}`
+);
