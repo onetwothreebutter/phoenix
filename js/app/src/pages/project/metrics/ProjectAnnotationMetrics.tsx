@@ -6,6 +6,9 @@ import { graphql, useLazyLoadQuery } from "react-relay";
 import { Loading, Text } from "@phoenix/components";
 import {
   type AnnotationOptimizationConfig,
+  AnnotationTrendWarningPill,
+  AnnotationTrendWarningTab,
+  getOptimizationTrend,
   getPositiveOptimizationFromConfig,
 } from "@phoenix/components/annotation";
 import { useProjectAnnotationConfigsByName } from "@phoenix/components/annotation/useProjectAnnotationConfigsByName";
@@ -142,11 +145,17 @@ function ProjectAnnotationMetricsPanel({
     ? view
     : getDefaultAnnotationMetricsView(series);
   const showViewToggle = series.views.length > 1;
+  // Only warn: an improving or flat trend needs no call to action
+  const isWorsening =
+    getOptimizationTrend({ points: series.data, config: annotationConfig })
+      ?.verdict === "worse";
 
   return (
     <ChartPanel
       title={series.name}
       subtitle={PROJECT_ANNOTATION_METRIC_CHART_DESCRIPTION}
+      titleAccessory={isWorsening ? <AnnotationTrendWarningPill /> : undefined}
+      aside={isWorsening ? <AnnotationTrendWarningTab /> : undefined}
       fillHeight={fillHeight}
       actions={
         showViewToggle ? (

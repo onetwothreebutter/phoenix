@@ -12,6 +12,10 @@ import {
 } from "recharts";
 
 import {
+  AnnotationTrendWarningPill,
+  AnnotationTrendWarningTab,
+} from "@phoenix/components/annotation";
+import {
   ChartPanel,
   ChartSkeleton,
   DeferredChartPanel,
@@ -117,6 +121,22 @@ export const Default: Story = {
     title: "Traffic",
     subtitle: "Spans by status",
     fillHeight: false,
+    children: <ExampleChart />,
+  },
+};
+
+/**
+ * A `titleAccessory` sits right after the title and an `aside` runs the full
+ * height of the right edge. The project metrics page uses both to flag an
+ * annotation trending in the wrong direction for its optimization direction.
+ */
+export const WithTrendWarning: Story = {
+  args: {
+    title: "hallucination_rate",
+    subtitle: "Evaluation results over time",
+    fillHeight: false,
+    titleAccessory: <AnnotationTrendWarningPill />,
+    aside: <AnnotationTrendWarningTab />,
     children: <ExampleChart />,
   },
 };
