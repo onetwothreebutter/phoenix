@@ -57,13 +57,19 @@ const chartPanelCSS = css`
 
   .chart-panel__header-content {
     display: flex;
-    flex: 1 1 auto;
+    /* Hug the title so a title accessory sits right next to it */
+    flex: 0 1 auto;
     flex-direction: column;
     min-width: 0;
   }
 
+  .chart-panel__title-accessory {
+    flex: none;
+  }
+
   .chart-panel__actions {
     flex: none;
+    margin-left: auto;
   }
 
   .chart-panel__title,
@@ -97,6 +103,31 @@ const chartPanelCSS = css`
 `;
 
 /**
+ * With an aside the panel lays out as a row: the header and chart stack in the
+ * main column, and the aside runs the full height of the right edge. The plot
+ * narrows to make room rather than being covered.
+ */
+const withAsidePanelCSS = css`
+  flex-direction: row;
+
+  .chart-panel__main {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .chart-panel__aside {
+    flex: none;
+    align-self: stretch;
+    display: flex;
+    overflow: hidden;
+    border-radius: 0 var(--global-rounding-medium) var(--global-rounding-medium)
+      0;
+  }
+`;
+
+/**
  * In a fill-height context (e.g. a resizable charts strip or panel) the panel's
  * size is imposed by its parent, so it can be a size query container and shed
  * the subtitle as it gets short.
@@ -114,6 +145,10 @@ const fillHeightPanelCSS = css`
 interface ChartPanelHeaderProps {
   title: string;
   subtitle?: string;
+  /**
+   * Content shown right after the title, such as a status pill
+   */
+  titleAccessory?: React.ReactNode;
   actions?: React.ReactNode;
   /**
    * Semantic heading level for the chart title. The visual size remains
@@ -126,6 +161,7 @@ interface ChartPanelHeaderProps {
 function ChartPanelHeader({
   title,
   subtitle,
+  titleAccessory,
   actions,
   headingLevel = 4,
 }: ChartPanelHeaderProps) {
@@ -151,6 +187,9 @@ function ChartPanelHeader({
           </Text>
         )}
       </div>
+      {titleAccessory && (
+        <div className="chart-panel__title-accessory">{titleAccessory}</div>
+      )}
       {actions && <div className="chart-panel__actions">{actions}</div>}
     </div>
   );
@@ -158,6 +197,11 @@ function ChartPanelHeader({
 
 interface ChartPanelProps extends ChartPanelHeaderProps {
   children: React.ReactNode;
+  /**
+   * Content running the full height of the panel's right edge, such as a
+   * status tab. The chart narrows to make room for it.
+   */
+  aside?: React.ReactNode;
   /**
    * Stretch the chart area to the panel's available height (e.g. inside a
    * resizable panel) instead of the fixed default height
@@ -176,20 +220,19 @@ interface ChartPanelProps extends ChartPanelHeaderProps {
 export function ChartPanel({
   title,
   subtitle,
+  titleAccessory,
   actions,
+  aside,
   headingLevel,
   fillHeight = false,
   children,
 }: ChartPanelProps) {
-  return (
-    <section
-      css={[chartPanelCSS, fillHeight && fillHeightPanelCSS]}
-      className="chart-panel"
-      data-testid="chart-panel"
-    >
+  const content = (
+    <>
       <ChartPanelHeader
         title={title}
         subtitle={subtitle}
+        titleAccessory={titleAccessory}
         actions={actions}
         headingLevel={headingLevel}
       />
@@ -201,6 +244,26 @@ export function ChartPanel({
           <Suspense fallback={<ChartSkeleton />}>{children}</Suspense>
         </ErrorBoundary>
       </div>
+    </>
+  );
+  return (
+    <section
+      css={[
+        chartPanelCSS,
+        aside != null && withAsidePanelCSS,
+        fillHeight && fillHeightPanelCSS,
+      ]}
+      className="chart-panel"
+      data-testid="chart-panel"
+    >
+      {aside != null ? (
+        <>
+          <div className="chart-panel__main">{content}</div>
+          <div className="chart-panel__aside">{aside}</div>
+        </>
+      ) : (
+        content
+      )}
     </section>
   );
 }
