@@ -1,49 +1,34 @@
 import { css } from "@emotion/react";
 
-import { Icon, Icons } from "@phoenix/components";
+import { Badge, Icon, Icons } from "@phoenix/components";
 
 /**
- * Warning surfaces are a solid fill, so their foreground needs to stay dark in
- * both themes. Deriving it from the warning color keeps it in the same hue,
- * the same way Badge derives its colors. Lightness 5 keeps text contrast
- * above 5.5:1 against the light theme's darker warning orange.
+ * Stretches a warning Badge into a full-height tab so it shares the badge's
+ * theme-aware warning colors. Only the edge facing the chart keeps a border;
+ * the panel provides the rest of the frame.
  */
-const trendWarningColorsCSS = css`
-  background-color: var(--global-color-warning);
-  color: lch(from var(--global-color-warning) 5 calc(c * 0.3) h);
-`;
-
-const trendWarningPillCSS = css`
-  display: inline-flex;
-  align-items: center;
-  gap: var(--global-dimension-size-125);
-  padding: var(--global-dimension-size-65) var(--global-dimension-size-125);
-  border-radius: var(--global-rounding-full);
-  font-size: var(--global-font-size-s);
-  line-height: var(--global-line-height-s);
-  white-space: nowrap;
-`;
-
 const trendWarningTabCSS = css`
   display: flex;
-  align-items: center;
   justify-content: center;
   width: var(--global-dimension-size-600);
-  height: 100%;
-  /* Icon renders at 1.2em, so this gives a 24px icon */
-  font-size: var(--global-dimension-size-250);
+  border-width: 0 0 0 1px;
+  border-radius: 0;
+`;
+
+const trendWarningTabIconCSS = css`
+  font-size: var(--global-dimension-size-300);
 `;
 
 /**
- * A pill telling the reader that an annotation has moved in the wrong
+ * A badge telling the reader that an annotation has moved in the wrong
  * direction for its optimization direction over the visible time range.
  */
 export function AnnotationTrendWarningPill() {
   return (
-    <span css={[trendWarningColorsCSS, trendWarningPillCSS]}>
+    <Badge variant="warning">
       <Icon svg={<Icons.AlertTriangleFilled />} />
       Trending worse
-    </span>
+    </Badge>
   );
 }
 
@@ -54,8 +39,8 @@ export function AnnotationTrendWarningPill() {
  */
 export function AnnotationTrendWarningTab() {
   return (
-    <div css={[trendWarningColorsCSS, trendWarningTabCSS]} aria-hidden>
-      <Icon svg={<Icons.AlertTriangleFilled />} />
-    </div>
+    <Badge variant="warning" css={trendWarningTabCSS} aria-hidden>
+      <Icon svg={<Icons.AlertTriangleFilled />} css={trendWarningTabIconCSS} />
+    </Badge>
   );
 }
